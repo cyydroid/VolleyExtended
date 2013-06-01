@@ -24,9 +24,9 @@ import android.widget.ImageView;
 
 import eu.the4thfloor.volleyextended.Request;
 import eu.the4thfloor.volleyextended.RequestQueue;
-import eu.the4thfloor.volleyextended.VolleyError;
 import eu.the4thfloor.volleyextended.Response.ErrorListener;
 import eu.the4thfloor.volleyextended.Response.Listener;
+import eu.the4thfloor.volleyextended.VolleyError;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -167,6 +167,25 @@ public class ImageLoader {
     public void onResponse(ImageContainer response, boolean isImmediate);
   }
 
+
+  /**
+   * Checks if the item is available in the cache.
+   * 
+   * @param requestUrl
+   *          The url of the remote image
+   * @param maxWidth
+   *          The maximum width of the returned image.
+   * @param maxHeight
+   *          The maximum height of the returned image.
+   * @return True if the item exists in cache, false otherwise.
+   */
+  public boolean isCached(final String requestUrl, final int maxWidth, final int maxHeight) {
+
+    throwIfNotOnMainThread();
+
+    final String cacheKey = getCacheKey(requestUrl, maxWidth, maxHeight);
+    return this.mCache.getBitmap(cacheKey) != null;
+  }
 
   /**
    * Returns an ImageContainer for the requested URL.
