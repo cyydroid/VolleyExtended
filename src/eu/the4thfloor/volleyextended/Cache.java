@@ -112,5 +112,4 @@ public interface Cache {
       return this.softTtl < System.currentTimeMillis();
     }
   }
-
 }

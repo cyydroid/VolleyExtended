@@ -260,11 +260,11 @@ public class ImageLoader {
 
         onGetImageSuccess(cacheKey, response);
       }
-    }, maxWidth, maxHeight, Config.RGB_565, new ErrorListener<ImageContainer>() {
+    }, maxWidth, maxHeight, Config.RGB_565, new ErrorListener<Bitmap>() {
 
 
       @Override
-      public void onErrorResponse(final VolleyError error, final ImageContainer cachedResponse) {
+      public void onErrorResponse(final VolleyError error, final Bitmap cachedResponse) {
 
         onGetImageError(cacheKey, error);
       }
