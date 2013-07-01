@@ -135,7 +135,25 @@ public class NetworkImageView extends ImageView {
         this.mImageContainer.cancelRequest();
         this.mImageContainer = null;
       }
-      setImageBitmap(null);
+
+      if (this.mErrorImageId != 0) {
+        if (isInLayoutPass) {
+          post(new Runnable() {
+
+
+            @Override
+            public void run() {
+
+              setImageResource(NetworkImageView.this.mErrorImageId);
+            }
+          });
+        } else {
+          setImageResource(NetworkImageView.this.mErrorImageId);
+        }
+      } else {
+        setImageBitmap(null);
+      }
+
       return;
     }
 
