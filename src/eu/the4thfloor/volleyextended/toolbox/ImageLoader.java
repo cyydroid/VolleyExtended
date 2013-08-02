@@ -24,9 +24,9 @@ import android.widget.ImageView;
 
 import eu.the4thfloor.volleyextended.Request;
 import eu.the4thfloor.volleyextended.RequestQueue;
-import eu.the4thfloor.volleyextended.VolleyError;
 import eu.the4thfloor.volleyextended.Response.ErrorListener;
 import eu.the4thfloor.volleyextended.Response.Listener;
+import eu.the4thfloor.volleyextended.VolleyError;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -169,6 +169,25 @@ public class ImageLoader {
 
 
   /**
+   * Checks if the item is available in the cache.
+   * 
+   * @param requestUrl
+   *          The url of the remote image
+   * @param maxWidth
+   *          The maximum width of the returned image.
+   * @param maxHeight
+   *          The maximum height of the returned image.
+   * @return True if the item exists in cache, false otherwise.
+   */
+  public boolean isCached(final String requestUrl, final int maxWidth, final int maxHeight) {
+
+    throwIfNotOnMainThread();
+
+    final String cacheKey = getCacheKey(requestUrl, maxWidth, maxHeight);
+    return this.mCache.getBitmap(cacheKey) != null;
+  }
+
+  /**
    * Returns an ImageContainer for the requested URL.
    * The ImageContainer will contain either the specified default bitmap or the loaded bitmap.
    * If the default was returned, the {@link ImageLoader} will be invoked when the
@@ -289,7 +308,7 @@ public class ImageLoader {
       request.mResponseBitmap = response;
 
       // Send the batched response
-      batchResponse(cacheKey, request, null);
+      batchResponse(cacheKey, request);
     }
   }
 
@@ -305,9 +324,12 @@ public class ImageLoader {
     // Remove this request from the list of in-flight requests.
     final BatchedImageRequest request = this.mInFlightRequests.remove(cacheKey);
 
+    // Set the error for this request
+    request.setError(error);
+
     if (request != null) {
       // Send the batched response
-      batchResponse(cacheKey, request, error);
+      batchResponse(cacheKey, request);
     }
   }
 
@@ -408,6 +430,9 @@ public class ImageLoader {
     /** The result of the request being tracked by this item */
     private Bitmap                           mResponseBitmap;
 
+    /** Error if one occurred for this response */
+    private VolleyError                      mError;
+
     /** List of all of the active ImageContainers that are interested in the request */
     private final LinkedList<ImageContainer> mContainers = new LinkedList<ImageContainer>();
 
@@ -424,6 +449,22 @@ public class ImageLoader {
 
       this.mRequest = request;
       this.mContainers.add(container);
+    }
+
+    /**
+     * Set the error for this response
+     */
+    public void setError(final VolleyError error) {
+
+      this.mError = error;
+    }
+
+    /**
+     * Get the error for this response
+     */
+    public VolleyError getError() {
+
+      return this.mError;
     }
 
     /**
@@ -465,7 +506,7 @@ public class ImageLoader {
    * @param error
    *          The volley error associated with the request (if applicable).
    */
-  private void batchResponse(final String cacheKey, final BatchedImageRequest request, final VolleyError error) {
+  private void batchResponse(final String cacheKey, final BatchedImageRequest request) {
 
     this.mBatchedResponses.put(cacheKey, request);
     // If we don't already have a batch delivery runnable in flight, make a new one.
@@ -485,11 +526,11 @@ public class ImageLoader {
               if (container.mListener == null) {
                 continue;
               }
-              if (error == null) {
+              if (bir.getError() == null) {
                 container.mBitmap = bir.mResponseBitmap;
                 container.mListener.onResponse(container, false);
               } else {
-                container.mListener.onErrorResponse(error, null);
+                container.mListener.onErrorResponse(bir.getError(), null);
               }
             }
           }

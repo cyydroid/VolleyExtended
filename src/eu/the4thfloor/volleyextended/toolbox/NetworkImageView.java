@@ -121,7 +121,6 @@ public class NetworkImageView extends ImageView {
 
     final boolean isFullyWrapContent = (getLayoutParams() != null) && (getLayoutParams().height == LayoutParams.WRAP_CONTENT)
         && (getLayoutParams().width == LayoutParams.WRAP_CONTENT);
-
     // if the view's bounds aren't known yet, and this is not a wrap-content/wrap-content
     // view, hold off on loading the image.
     if ((width == 0) && (height == 0) && !isFullyWrapContent) {
@@ -135,7 +134,25 @@ public class NetworkImageView extends ImageView {
         this.mImageContainer.cancelRequest();
         this.mImageContainer = null;
       }
-      setImageBitmap(null);
+
+      if (this.mErrorImageId != 0) {
+        if (isInLayoutPass) {
+          post(new Runnable() {
+
+
+            @Override
+            public void run() {
+
+              setImageResource(NetworkImageView.this.mErrorImageId);
+            }
+          });
+        } else {
+          setImageResource(NetworkImageView.this.mErrorImageId);
+        }
+      } else {
+        setImageBitmap(null);
+      }
+
       return;
     }
 
@@ -190,7 +207,7 @@ public class NetworkImageView extends ImageView {
           setImageResource(NetworkImageView.this.mDefaultImageId);
         }
       }
-    });
+    }, width, height);
 
     // update the ImageContainer to be the new bitmap container.
     this.mImageContainer = newContainer;
