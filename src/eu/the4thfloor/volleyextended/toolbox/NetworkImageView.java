@@ -19,7 +19,7 @@ package eu.the4thfloor.volleyextended.toolbox;
 import android.content.Context;
 import android.text.TextUtils;
 import android.util.AttributeSet;
-import android.view.ViewGroup;
+import android.view.ViewGroup.LayoutParams;
 import android.widget.ImageView;
 
 import eu.the4thfloor.volleyextended.VolleyError;
@@ -119,9 +119,8 @@ public class NetworkImageView extends ImageView {
     final int width = getWidth();
     final int height = getHeight();
 
-    final boolean isFullyWrapContent = (getLayoutParams().height == ViewGroup.LayoutParams.WRAP_CONTENT)
-        && (getLayoutParams().width == ViewGroup.LayoutParams.WRAP_CONTENT);
-
+    final boolean isFullyWrapContent = (getLayoutParams() != null) && (getLayoutParams().height == LayoutParams.WRAP_CONTENT)
+        && (getLayoutParams().width == LayoutParams.WRAP_CONTENT);
     // if the view's bounds aren't known yet, and this is not a wrap-content/wrap-content
     // view, hold off on loading the image.
     if ((width == 0) && (height == 0) && !isFullyWrapContent) {
