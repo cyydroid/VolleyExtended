@@ -116,15 +116,19 @@ public class NetworkImageView extends ImageView {
    */
   private void loadImageIfNecessary(final boolean isInLayoutPass) {
 
-    final int width = getWidth();
-    final int height = getHeight();
+    int width = getWidth();
+    int height = getHeight();
 
     final boolean isFullyWrapContent = (getLayoutParams() != null) && (getLayoutParams().height == LayoutParams.WRAP_CONTENT)
         && (getLayoutParams().width == LayoutParams.WRAP_CONTENT);
+
     // if the view's bounds aren't known yet, and this is not a wrap-content/wrap-content
     // view, hold off on loading the image.
     if ((width == 0) && (height == 0) && !isFullyWrapContent) {
       return;
+    } else if (isFullyWrapContent) {
+      width = 0;
+      height = 0;
     }
 
     // if the URL to be loaded in this view is empty, cancel any old requests and clear the
