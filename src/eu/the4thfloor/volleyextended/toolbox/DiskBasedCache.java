@@ -21,14 +21,13 @@ import android.os.SystemClock;
 import eu.the4thfloor.volleyextended.Cache;
 import eu.the4thfloor.volleyextended.VolleyLog;
 
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.util.Collections;
 import java.util.HashMap;
@@ -62,8 +61,8 @@ public class DiskBasedCache implements Cache {
   /** High water mark percentage for the cache */
   private static final float             HYSTERESIS_FACTOR        = 0.9f;
 
-  /** Current cache version */
-  private static final int               CACHE_VERSION            = 2;
+  /** Magic number for current version of cache file format. */
+  private static final int               CACHE_MAGIC              = 0x20120504;
 
 
   /**
@@ -425,21 +424,21 @@ public class DiskBasedCache implements Cache {
     public static CacheHeader readHeader(final InputStream is) throws IOException {
 
       final CacheHeader entry = new CacheHeader();
-      final ObjectInputStream ois = new ObjectInputStream(is);
-      final int version = ois.readByte();
-      if (version != CACHE_VERSION) {
+      final int magic = readInt(is);
+      if (magic != CACHE_MAGIC) {
+
         // don't bother deleting, it'll get pruned eventually
         throw new IOException();
       }
-      entry.key = ois.readUTF();
-      entry.etag = ois.readUTF();
+      entry.key = readString(is);
+      entry.etag = readString(is);
       if (entry.etag.equals("")) {
         entry.etag = null;
       }
-      entry.serverDate = ois.readLong();
-      entry.ttl = ois.readLong();
-      entry.softTtl = ois.readLong();
-      entry.responseHeaders = readStringStringMap(ois);
+      entry.serverDate = readLong(is);
+      entry.ttl = readLong(is);
+      entry.softTtl = readLong(is);
+      entry.responseHeaders = readStringStringMap(is);
       return entry;
     }
 
@@ -464,52 +463,20 @@ public class DiskBasedCache implements Cache {
     public boolean writeHeader(final OutputStream os) {
 
       try {
-        final ObjectOutputStream oos = new ObjectOutputStream(os);
-        oos.writeByte(CACHE_VERSION);
-        oos.writeUTF(this.key);
-        oos.writeUTF(this.etag == null ? "" : this.etag);
-        oos.writeLong(this.serverDate);
-        oos.writeLong(this.ttl);
-        oos.writeLong(this.softTtl);
-        writeStringStringMap(this.responseHeaders, oos);
-        oos.flush();
+        writeInt(os, CACHE_MAGIC);
+        writeString(os, this.key);
+        writeString(os, this.etag == null ? "" : this.etag);
+        writeLong(os, this.serverDate);
+        writeLong(os, this.ttl);
+        writeLong(os, this.softTtl);
+        writeStringStringMap(this.responseHeaders, os);
+        os.flush();
         return true;
       }
       catch (final IOException e) {
         VolleyLog.d("%s", e.toString());
         return false;
       }
-    }
-
-    /**
-     * Writes all entries of {@code map} into {@code oos}.
-     */
-    private static void writeStringStringMap(final Map<String, String> map, final ObjectOutputStream oos) throws IOException {
-
-      if (map != null) {
-        oos.writeInt(map.size());
-        for (final Map.Entry<String, String> entry : map.entrySet()) {
-          oos.writeUTF(entry.getKey());
-          oos.writeUTF(entry.getValue());
-        }
-      } else {
-        oos.writeInt(0);
-      }
-    }
-
-    /**
-     * @return a string to string map which contains the entries read from {@code ois} previously written by {@link #writeStringStringMap}
-     */
-    private static Map<String, String> readStringStringMap(final ObjectInputStream ois) throws IOException {
-
-      final int size = ois.readInt();
-      final Map<String, String> result = (size == 0) ? Collections.<String, String> emptyMap() : new HashMap<String, String>(size);
-      for (int i = 0; i < size; i++) {
-        final String key = ois.readUTF().intern();
-        final String value = ois.readUTF().intern();
-        result.put(key, value);
-      }
-      return result;
     }
   }
 
@@ -543,5 +510,109 @@ public class DiskBasedCache implements Cache {
       }
       return result;
     }
+  }
+
+
+  /*
+   * Homebrewed simple serialization system used for reading and writing cache
+   * headers on disk. Once upon a time, this used the standard Java
+   * Object{Input,Output}Stream, but the default implementation relies heavily
+   * on reflection (even for standard types) and generates a ton of garbage.
+   */
+
+  /**
+   * Simple wrapper around {@link InputStream#read()} that throws EOFException
+   * instead of returning -1.
+   */
+  private static int read(final InputStream is) throws IOException {
+
+    final int b = is.read();
+    if (b == -1) {
+      throw new EOFException();
+    }
+    return b;
+  }
+
+  static void writeInt(final OutputStream os, final int n) throws IOException {
+
+    os.write((n >> 0) & 0xff);
+    os.write((n >> 8) & 0xff);
+    os.write((n >> 16) & 0xff);
+    os.write((n >> 24) & 0xff);
+  }
+
+  static int readInt(final InputStream is) throws IOException {
+
+    int n = 0;
+    n |= (read(is) << 0);
+    n |= (read(is) << 8);
+    n |= (read(is) << 16);
+    n |= (read(is) << 24);
+    return n;
+  }
+
+  static void writeLong(final OutputStream os, final long n) throws IOException {
+
+    os.write((byte) (n >>> 0));
+    os.write((byte) (n >>> 8));
+    os.write((byte) (n >>> 16));
+    os.write((byte) (n >>> 24));
+    os.write((byte) (n >>> 32));
+    os.write((byte) (n >>> 40));
+    os.write((byte) (n >>> 48));
+    os.write((byte) (n >>> 56));
+  }
+
+  static long readLong(final InputStream is) throws IOException {
+
+    long n = 0;
+    n |= ((read(is) & 0xFFL) << 0);
+    n |= ((read(is) & 0xFFL) << 8);
+    n |= ((read(is) & 0xFFL) << 16);
+    n |= ((read(is) & 0xFFL) << 24);
+    n |= ((read(is) & 0xFFL) << 32);
+    n |= ((read(is) & 0xFFL) << 40);
+    n |= ((read(is) & 0xFFL) << 48);
+    n |= ((read(is) & 0xFFL) << 56);
+    return n;
+  }
+
+  static void writeString(final OutputStream os, final String s) throws IOException {
+
+    final byte[] b = s.getBytes("UTF-8");
+    writeLong(os, b.length);
+    os.write(b, 0, b.length);
+  }
+
+  static String readString(final InputStream is) throws IOException {
+
+    final int n = (int) readLong(is);
+    final byte[] b = streamToBytes(is, n);
+    return new String(b, "UTF-8");
+  }
+
+  static void writeStringStringMap(final Map<String, String> map, final OutputStream os) throws IOException {
+
+    if (map != null) {
+      writeInt(os, map.size());
+      for (final Map.Entry<String, String> entry : map.entrySet()) {
+        writeString(os, entry.getKey());
+        writeString(os, entry.getValue());
+      }
+    } else {
+      writeInt(os, 0);
+    }
+  }
+
+  static Map<String, String> readStringStringMap(final InputStream is) throws IOException {
+
+    final int size = readInt(is);
+    final Map<String, String> result = (size == 0) ? Collections.<String, String> emptyMap() : new HashMap<String, String>(size);
+    for (int i = 0; i < size; i++) {
+      final String key = readString(is).intern();
+      final String value = readString(is).intern();
+      result.put(key, value);
+    }
+    return result;
   }
 }
